@@ -45,11 +45,11 @@ def stacked_cols(df: pd.DataFrame, x: str, x_order: list[str], color: str, domai
                  avg: float | None = None, partial: str | None = None, height: int = 340) -> alt.LayerChart:
     """세로 누적 막대 + 막대 위 합계 + 평균 점선. partial 은 '진행 중' 표시할 x 값.
 
-    x 축은 넘겨받은 시간 순서(날짜, 월)를 지키고, 쌓는 순서만 큰 항목이 아래로 온다. 색 대응은 domain 그대로 둔다.
+    x 축은 넘겨받은 시간 순서(날짜, 월), 쌓는 순서와 범례는 domain 순서를 지킨다. 색 대응은 domain 그대로 둔다.
     """
     tot = df.groupby(x)[val].sum().reset_index()
     x_order = [k for k in x_order if k in set(tot[x])]  # 시간 축은 날짜·월 순서 그대로
-    stack = list(df.groupby(color)[val].sum().sort_values(ascending=False).index)
+    stack = list(domain)  # 시간 축 차트는 범례·쌓는 순서를 정해진 순서로 고정
     tot["lbl"] = tot[val].map(lambda v: f"{int(v):,}")
     if partial is not None:
         tot.loc[tot[x] == partial, "lbl"] = tot.loc[tot[x] == partial, "lbl"] + " 진행 중"
@@ -98,3 +98,34 @@ def stacked_hbar(df: pd.DataFrame, cat: str, color: str, domain: list[str], colo
     text = alt.Chart(tot).mark_text(align="left", dx=6, fontWeight=600, **LABEL).encode(
         y=yenc, x=f"{val}:Q", text=alt.Text(f"{val}:Q", format=","))
     return alt.layer(bars, text).properties(height=max(row * len(order), 60), width="container")
+
+
+# 크리티컬 유형 반원 그래프: 4색(갈색, 테라코타, 황토, 모래)과 그 연한 단계 두 개
+HALF_COLORS = [T.ACCENT, T.INK, T.AMBER, "#dd8a74", T.MUTED, T.SAND]
+
+
+def half_donut(df: pd.DataFrame, cat: str, val: str, domain: list[str], center: str, sub: str,
+               height: int = 230) -> alt.LayerChart:
+    """반원(위쪽 반) 도넛. 조각과 범례는 많은 순, 범례에 '유형 n건'. 아래 가운데에 합계."""
+    d = df.set_index(cat)[[val]].reindex(domain, fill_value=0).rename_axis(cat).reset_index()
+    d = d.sort_values(val, ascending=False, kind="stable").reset_index(drop=True)
+    d["_o"] = d.index
+    d["범례"] = d[cat] + "  " + d[val].map(lambda v: f"{int(v):,}건")
+    legend_order = list(d["범례"])
+    r = height - 16
+    cx, cy = alt.expr("width / 2"), alt.expr(f"height - 8")
+    arc = alt.Chart(d[d[val] > 0]).mark_arc(innerRadius=r * 0.58, outerRadius=r, x=cx, y=cy,
+                                            stroke=T.PAPER, strokeWidth=2).encode(
+        theta=alt.Theta(f"{val}:Q", stack=True, scale=alt.Scale(range=[-1.5708, 1.5708])),
+        color=alt.Color("범례:N", title=None, scale=alt.Scale(domain=legend_order, range=HALF_COLORS[:len(d)]),
+                        legend=alt.Legend(orient="right", labelFontSize=13, labelColor=T.INK, symbolType="circle",
+                                          symbolSize=160, rowPadding=8, labelLimit=220, offset=24)),
+        order=alt.Order("_o:Q"),
+        tooltip=[alt.Tooltip(f"{cat}:N", title="유형"), alt.Tooltip(f"{val}:Q", title="건수")],
+    )
+    txt = pd.DataFrame({"t": [center], "s": [sub]})
+    big = alt.Chart(txt).mark_text(x=cx, y=alt.expr("height - 36"), fontSize=36, font=T.FONT,
+                                   color=T.INK, fontWeight=300).encode(text="t:N")
+    small = alt.Chart(txt).mark_text(x=cx, y=alt.expr("height - 10"), fontSize=13, font=T.FONT,
+                                     color=T.MUTED).encode(text="s:N")
+    return alt.layer(arc, big, small).properties(height=height, width="container")

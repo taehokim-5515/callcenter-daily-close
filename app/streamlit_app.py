@@ -24,6 +24,7 @@ COLOR_GROUP = {"배송": "배송", "상품": "상품", "취소/반품/교환": "
                "단순문의": "단순문의, 클레임", **{b: "단순문의, 클레임" for b in BRANDS}}
 COLOR_ORDER = ["배송", "상품", "취소/반품/교환", "단순문의, 클레임"]
 REASON_TOP = ["고객변심", "상품불만", "오매핑"]  # 나머지 사유는 기타로 묶어 4색
+CRITICAL = ["오패킹", "오매핑", "출고지연", "배송일정", "이물/혼입", "벌레/곰팡이"]  # 일일 마감에서 따로 보는 유형
 LEVEL1 = {"배송": "배송", "상품": "상품", "단순문의": "단순문의", "취소/반품/교환": "취소/반품/교환",
           **{b: "브랜드 클레임" for b in BRANDS}}
 
@@ -248,17 +249,46 @@ with tab_day:
             ("취소/반품/교환", fmt(by_grp.get("취소/반품/교환", 0)), f"건, 클레임 {fmt(sum(by_grp.get(b, 0) for b in BRANDS))}건"),
         ]), unsafe_allow_html=True)
 
-        # 1) 유형 순위: 상위 10개
+        # 1) 크리티컬 유형: 반원 그래프 + 전 영업일 대비
         tt = cur.groupby("type")["cnt"].sum().reset_index()
-        tt = tt[tt["cnt"] > 0].sort_values("cnt", ascending=False)
-        if len(tt):
-            top3 = tt.head(3)
-            share3 = top3["cnt"].sum() / max(total, 1) * 100
-            rest = tt.iloc[10:]
-            head("문의 유형 상위 10",
-                 f"{', '.join(top3['type'])} 세 유형이 {fmt(top3['cnt'].sum())}건으로 전체의 {share3:.0f}%입니다.",
-                 f"그 외 {len(rest)}개 유형 {fmt(rest['cnt'].sum())}건" if len(rest) else None)
-            st.altair_chart(C.hbar(tt.head(10), "type", "cnt", total=int(total)), use_container_width=True, theme=None)
+        pt = prev.groupby("type")["cnt"].sum()
+        crit = tt[tt["type"].isin(CRITICAL)]
+        crit_n = int(crit["cnt"].sum())
+        crit_prev = int(pt.reindex(CRITICAL, fill_value=0).sum())
+        if crit_n:
+            c1st = crit.sort_values("cnt", ascending=False).iloc[0]
+            head("크리티컬 유형: " + ", ".join(CRITICAL),
+                 f"크리티컬 유형 {fmt(crit_n)}건, 전체의 {crit_n / max(total, 1) * 100:.0f}%이고 "
+                 f"최다는 {c1st['type']} {fmt(c1st['cnt'])}건입니다.")
+        else:
+            head("크리티컬 유형: " + ", ".join(CRITICAL), "크리티컬 유형 문의가 없었습니다.")
+        cc1, cc2 = st.columns([3, 2], gap="large")
+        with cc1:
+            st.altair_chart(C.half_donut(crit, "type", "cnt", CRITICAL, f"{crit_n:,}건",
+                                         f"전체 {fmt(total)}건 중 {crit_n / max(total, 1) * 100:.0f}%"),
+                            use_container_width=True, theme=None)
+        with cc2:
+            cur_c = tt.set_index("type")["cnt"].reindex(CRITICAL, fill_value=0)
+            prev_c = pt.reindex(CRITICAL, fill_value=0)
+            rows = sorted(CRITICAL, key=lambda k: -cur_c[k])
+            items = "".join(
+                f'<div><dt>{k}</dt><dd>{fmt(cur_c[k])}<small>건</small>'
+                f'<span class="{"up" if cur_c[k] > prev_c[k] else "flat"}">'
+                f'{signed(cur_c[k] - prev_c[k]) if prev_days else "-"}</span></dd></div>' for k in rows)
+            st.markdown(f'<dl class="crit-list"><div class="crit-head"><dt>유형</dt><dd>오늘<span>전 영업일 대비</span></dd></div>'
+                        f'{items}<div class="crit-sum"><dt>합계</dt><dd>{fmt(crit_n)}<small>건</small>'
+                        f'<span>{signed(crit_n - crit_prev) if prev_days else "-"}</span></dd></div></dl>',
+                        unsafe_allow_html=True)
+
+        # 2) 그 외 유형: 수평 막대
+        other = tt[~tt["type"].isin(CRITICAL) & (tt["cnt"] > 0)].sort_values("cnt", ascending=False)
+        if len(other):
+            o3 = other.head(3)
+            head(f"그 외 유형 {len(other)}개, {fmt(other['cnt'].sum())}건",
+                 f"{', '.join(o3['type'])} 순으로 많고, 세 유형이 전체의 "
+                 f"{o3['cnt'].sum() / max(total, 1) * 100:.0f}%입니다.")
+            st.altair_chart(C.hbar(other, "type", "cnt", total=int(total), row=28),
+                            use_container_width=True, theme=None)
 
         # 2) 대분류 구성 | 반품 처리
         g = (cur.assign(묶음=cur["category"].map(LEVEL1)).groupby("묶음")["cnt"].sum().reset_index())
@@ -338,14 +368,17 @@ with tab_month:
         pv = mon.pivot_table(index=key, columns="day", values="cnt", aggfunc="sum", fill_value=0)
         pv.columns = [f"{int(c[8:])}일" for c in pv.columns]
         pv["합계"] = pv.sum(axis=1)
-        pv = pv.sort_values("합계", ascending=False)
+        if key == "category":
+            pv = pv.reindex([g for g in GROUP_ORDER if g in pv.index])
+        else:
+            pv = pv.sort_values("합계", ascending=False)
         pv.loc["합계"] = pv.sum()
         pv = pv.rename_axis(index=view, columns=None)
         with st.expander(f"{view} x 일자 표 보기"):
             st.dataframe(pv, use_container_width=True)
 
         mk = mon.pivot_table(index="market", columns="category", values="cnt", aggfunc="sum", fill_value=0)
-        mk = mk[mk.sum().sort_values(ascending=False).index]
+        mk = mk[[g for g in GROUP_ORDER if g in mk.columns]]
         mk["합계"] = mk.sum(axis=1)
         mk = mk.sort_values("합계", ascending=False).rename_axis(index="마켓", columns=None)
         st.download_button("월 집계 엑셀 받기", to_xlsx({f"{view}x일자": pv, "마켓x대분류": mk}),
