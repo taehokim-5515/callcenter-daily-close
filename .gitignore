@@ -1,0 +1,6 @@
+.streamlit/secrets.toml
+data/
+__pycache__/
+.hallmark/
+desktop.ini
+*.pyc
