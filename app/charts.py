@@ -105,27 +105,29 @@ HALF_COLORS = [T.ACCENT, T.INK, T.AMBER, "#dd8a74", T.MUTED, T.SAND]
 
 
 def half_donut(df: pd.DataFrame, cat: str, val: str, domain: list[str], center: str, sub: str,
-               height: int = 230) -> alt.LayerChart:
+               height: int = 250) -> alt.LayerChart:
     """반원(위쪽 반) 도넛. 조각과 범례는 많은 순, 범례에 '유형 n건'. 아래 가운데에 합계."""
     d = df.set_index(cat)[[val]].reindex(domain, fill_value=0).rename_axis(cat).reset_index()
     d = d.sort_values(val, ascending=False, kind="stable").reset_index(drop=True)
     d["_o"] = d.index
     d["범례"] = d[cat] + "  " + d[val].map(lambda v: f"{int(v):,}건")
     legend_order = list(d["범례"])
-    r = height - 16
-    cx, cy = alt.expr("width / 2"), alt.expr(f"height - 8")
-    arc = alt.Chart(d[d[val] > 0]).mark_arc(innerRadius=r * 0.58, outerRadius=r, x=cx, y=cy,
+    # 반지름은 그려질 폭과 높이 중 작은 쪽에 맞춘다(좁은 화면에서 잘리지 않게)
+    R = f"min(width / 2 - 8, height - 12)"
+    cx, cy = alt.expr("width / 2"), alt.expr("height - 4")
+    arc = alt.Chart(d[d[val] > 0]).mark_arc(innerRadius=alt.expr(f"{R} * 0.58"), outerRadius=alt.expr(R), x=cx, y=cy,
                                             stroke=T.PAPER, strokeWidth=2).encode(
         theta=alt.Theta(f"{val}:Q", stack=True, scale=alt.Scale(range=[-1.5708, 1.5708])),
         color=alt.Color("범례:N", title=None, scale=alt.Scale(domain=legend_order, range=HALF_COLORS[:len(d)]),
-                        legend=alt.Legend(orient="right", labelFontSize=13, labelColor=T.INK, symbolType="circle",
-                                          symbolSize=160, rowPadding=8, labelLimit=220, offset=24)),
+                        legend=alt.Legend(orient="bottom", direction="horizontal", columns=3, labelFontSize=13,
+                                          labelColor=T.INK, symbolType="circle", symbolSize=140, rowPadding=6,
+                                          columnPadding=18, labelLimit=200, offset=16)),
         order=alt.Order("_o:Q"),
         tooltip=[alt.Tooltip(f"{cat}:N", title="유형"), alt.Tooltip(f"{val}:Q", title="건수")],
     )
     txt = pd.DataFrame({"t": [center], "s": [sub]})
-    big = alt.Chart(txt).mark_text(x=cx, y=alt.expr("height - 36"), fontSize=36, font=T.FONT,
+    big = alt.Chart(txt).mark_text(x=cx, y=alt.expr("height - 32"), fontSize=34, font=T.FONT,
                                    color=T.INK, fontWeight=300).encode(text="t:N")
-    small = alt.Chart(txt).mark_text(x=cx, y=alt.expr("height - 10"), fontSize=13, font=T.FONT,
+    small = alt.Chart(txt).mark_text(x=cx, y=alt.expr("height - 6"), fontSize=13, font=T.FONT,
                                      color=T.MUTED).encode(text="s:N")
     return alt.layer(arc, big, small).properties(height=height, width="container")
