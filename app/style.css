@@ -2,6 +2,7 @@
  * nav: top bar with tabs, day picker in the toolbar row · signature: the day's call ledger, one big total over the type bars · states: loading, empty, error, full · palette: warm 4-colour
  * axes: light/geometric-sans/cool · posture: committed · contrast: pass · v2.0.0 */
 /* Hallmark · pre-emit critique: P2 H- E2 S2 R2 V2 · weakest: Streamlit owns tables, tabs and inputs, so tokens reach them through config.toml as hex mirrors of :root */
+/* Hallmark · waive 7b · paper and accent ink are pure white · the user asked for a white background by name, warmth comes from the brown ink and terracotta */
 /* Hallmark · waive 37 · copy is Korean · Pretendard is the Hangul fallback behind Outfit and Onest, which have no Hangul */
 @import url("./tokens.css");
 @import url("./base.css");
