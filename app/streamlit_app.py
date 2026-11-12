@@ -321,7 +321,7 @@ with tab_month:
         daily["일"] = daily["day"].map(lambda s: f"{int(s[8:])}일")
         order = [f"{int(s[8:])}일" for s in sorted(tot.index)]
         above = int((tot > tot.mean()).sum())
-        head("일자별 문의 건수, 많은 날부터, 대분류 누적",
+        head("일자별 문의 건수, 대분류 누적",
              f"하루 평균 {fmt(round(tot.mean()))}건, 최다는 {dlabel(tot.idxmax())} {fmt(tot.max())}건입니다.",
              f"평균을 넘은 날 {above}일")
         st.altair_chart(C.stacked_cols(daily, "일", order, "묶음", COLOR_ORDER, avg=float(tot.mean())),
@@ -386,7 +386,7 @@ with tab_ret:
         mc = mr.groupby(["월", "사유"])["cnt"].sum().reset_index()
         full = full_m  # 진행 중인 달은 평균에서 뺀다
         peak = int(full.idxmax())
-        head("월별 반품 건수, 많은 달부터, 사유 누적",
+        head("월별 반품 건수, 사유 누적",
              f"월평균 {fmt(round(full.mean()))}건, {peak}월이 {fmt(full[peak])}건으로 가장 많았습니다.",
              "상위 3개 사유 외는 기타로 묶음. 일자 기록이 있는 달은 처리표 합, 없는 달은 월별반품누계 시트 값")
         st.altair_chart(C.stacked_cols(mc, "월", [f"{i}월" for i in range(1, 13)], "사유", [*REASON_TOP, "기타"],

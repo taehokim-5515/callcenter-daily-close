@@ -45,10 +45,10 @@ def stacked_cols(df: pd.DataFrame, x: str, x_order: list[str], color: str, domai
                  avg: float | None = None, partial: str | None = None, height: int = 340) -> alt.LayerChart:
     """세로 누적 막대 + 막대 위 합계 + 평균 점선. partial 은 '진행 중' 표시할 x 값.
 
-    막대는 합계가 큰 순(내림차순)으로 놓고, 쌓는 순서도 큰 항목이 아래로 온다. 색 대응은 domain 그대로 둔다.
+    x 축은 넘겨받은 시간 순서(날짜, 월)를 지키고, 쌓는 순서만 큰 항목이 아래로 온다. 색 대응은 domain 그대로 둔다.
     """
-    tot = df.groupby(x)[val].sum().reset_index().sort_values(val, ascending=False)
-    x_order = list(tot[x])
+    tot = df.groupby(x)[val].sum().reset_index()
+    x_order = [k for k in x_order if k in set(tot[x])]  # 시간 축은 날짜·월 순서 그대로
     stack = list(df.groupby(color)[val].sum().sort_values(ascending=False).index)
     tot["lbl"] = tot[val].map(lambda v: f"{int(v):,}")
     if partial is not None:
