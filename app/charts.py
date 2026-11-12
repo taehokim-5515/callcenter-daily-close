@@ -105,7 +105,7 @@ HALF_COLORS = [T.ACCENT, T.INK, T.AMBER, "#dd8a74", T.MUTED, T.SAND]
 
 
 def half_donut(df: pd.DataFrame, cat: str, val: str, domain: list[str], center: str, sub: str,
-               height: int = 300) -> alt.LayerChart:  # 범례(약 50px)가 이 높이 안에 들어간다
+               height: int = 240) -> alt.LayerChart:
     """반원(위쪽 반) 도넛. 조각과 범례는 많은 순, 범례에 '유형 n건'. 아래 가운데에 합계."""
     d = df.set_index(cat)[[val]].reindex(domain, fill_value=0).rename_axis(cat).reset_index()
     d = d.sort_values(val, ascending=False, kind="stable").reset_index(drop=True)
@@ -120,9 +120,7 @@ def half_donut(df: pd.DataFrame, cat: str, val: str, domain: list[str], center: 
                                             stroke=T.PAPER, strokeWidth=2).encode(
         theta=alt.Theta(f"{val}:Q", stack=True, scale=alt.Scale(range=[-1.5708, 1.5708])),
         color=alt.Color("범례:N", title=None, scale=alt.Scale(domain=legend_order, range=HALF_COLORS[:len(d)]),
-                        legend=alt.Legend(orient="bottom", direction="horizontal", columns=3, labelFontSize=13,
-                                          labelColor=T.INK, symbolType="circle", symbolSize=140, rowPadding=6,
-                                          columnPadding=18, labelLimit=200, offset=16)),
+                        legend=None),  # 범례는 half_legend() 가 그래프 아래 가운데에 HTML 로 그린다
         order=alt.Order("_o:Q"),
         tooltip=[alt.Tooltip(f"{cat}:N", title="유형"), alt.Tooltip(f"{val}:Q", title="건수")],
     )
@@ -132,3 +130,13 @@ def half_donut(df: pd.DataFrame, cat: str, val: str, domain: list[str], center: 
     small = alt.Chart(txt).mark_text(x=cx, y=alt.expr("height - 6"), fontSize=13, font=T.FONT,
                                      color=T.MUTED).encode(text="s:N")
     return alt.layer(arc, big, small).properties(height=height, width="container")
+
+
+def half_legend(df: pd.DataFrame, cat: str, val: str, domain: list[str]) -> str:
+    """반원 그래프 범례(HTML). 그래프와 같은 순서·색, 가운데 정렬."""
+    d = df.set_index(cat)[[val]].reindex(domain, fill_value=0).rename_axis(cat).reset_index()
+    d = d.sort_values(val, ascending=False, kind="stable").reset_index(drop=True)
+    items = "".join(
+        f'<li><span class="dot" style="--dot: {HALF_COLORS[i]}"></span>{r[cat]} <b>{int(r[val]):,}건</b></li>'
+        for i, r in d.iterrows())
+    return f'<ul class="half-legend">{items}</ul>'

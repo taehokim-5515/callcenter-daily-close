@@ -267,6 +267,7 @@ with tab_day:
             st.altair_chart(C.half_donut(crit, "type", "cnt", CRITICAL, f"{crit_n:,}건",
                                          f"전체 {fmt(total)}건 중 {crit_n / max(total, 1) * 100:.0f}%"),
                             use_container_width=True, theme=None)
+            st.markdown(C.half_legend(crit, "type", "cnt", CRITICAL), unsafe_allow_html=True)
         with cc2:
             cur_c = tt.set_index("type")["cnt"].reindex(CRITICAL, fill_value=0)
             prev_c = pt.reindex(CRITICAL, fill_value=0)

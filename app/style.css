@@ -86,6 +86,12 @@ html, body, .stApp, .stApp p, .stApp li, .stApp label, .stApp input, .stApp text
 .crit-list .crit-sum { border-bottom: 0; border-top: 1px solid var(--color-rule-2); }
 .crit-list .crit-sum dt { font-weight: 600; }
 
+/* half donut legend: centred under the arc */
+.half-legend { list-style: none; margin: calc(-1 * var(--space-xs)) auto 0; padding: 0; display: flex; flex-wrap: wrap; justify-content: center; gap: var(--space-xs) var(--space-lg); max-width: 34rem; }
+.stApp .half-legend li { margin: 0; display: inline-flex; align-items: center; gap: var(--space-xs); font-size: var(--text-md); color: var(--color-ink); white-space: nowrap; }
+.half-legend b { font-weight: 600; font-variant-numeric: tabular-nums; }
+.half-legend .dot { width: 10px; height: 10px; border-radius: var(--radius-pill); background: var(--dot); flex: none; }
+
 /* alerts: Streamlit's pale yellow text fails contrast; keep its tint, set ink text */
 .stApp [data-testid="stAlertContentWarning"] p, .stApp [data-testid="stAlertContentInfo"] p,
 .stApp [data-testid="stAlertContentSuccess"] p, .stApp [data-testid="stAlertContentError"] p { color: var(--color-ink); }
