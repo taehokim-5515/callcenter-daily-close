@@ -381,7 +381,10 @@ with tab_ret:
 def claim_context(claim: dict) -> str:
     """AI 에 붙일 회사 데이터 요약(텍스트)."""
     d = date.fromisoformat(claim["claim_date"])
-    lines = []
+    mdays = [x for x in DATES if x[:7] == claim["claim_date"][:7]]
+    lines = [f"## 집계 기준: {d.month}월 콜센터 기록은 {len(mdays)}일치"
+             + (f"({mdays[0]} ~ {mdays[-1]}, 영업일 기준)" if mdays else "(없음)")
+             + ". 이번 달 수치는 월 중간 누계입니다."]
     allc = q_claims()
     if len(allc):
         same = allc[(allc["brand"] == claim["brand"]) &
@@ -527,7 +530,7 @@ with tab_claim:
             if rec.get("detail"):
                 st.markdown(f"상세: {rec['detail']}")
             st.markdown(f"방향성: {rec['direction'] or '미기입'}")
-            a1, a2, a3, _ = st.columns([1, 1, 1, 2])
+            a1, a2, a3, _ = st.columns([1, 1, 1, 2], vertical_alignment="bottom")
             stv = a1.selectbox("상태", ["접수", "진행", "완료"], index=["접수", "진행", "완료"].index(rec["status"])
                                if rec["status"] in ("접수", "진행", "완료") else 0, key=f"st_{sel}")
             if stv != rec["status"]:

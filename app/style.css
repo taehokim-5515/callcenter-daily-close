@@ -73,6 +73,10 @@ html, body, .stApp, .stApp p, .stApp li, .stApp label, .stApp input, .stApp text
 .stApp [data-testid="stFileUploaderDropzone"] { border-radius: var(--radius-card); background: var(--color-paper-2); border: 1.5px dashed var(--color-rule-2); }
 .stApp [data-baseweb="input"], .stApp [data-baseweb="select"] > div, .stApp [data-baseweb="textarea"] { border-radius: 12px; }
 
+/* alerts: Streamlit's pale yellow text fails contrast on lavender; keep its tint, set ink text */
+.stApp [data-testid="stAlertContentWarning"] p, .stApp [data-testid="stAlertContentInfo"] p,
+.stApp [data-testid="stAlertContentSuccess"] p, .stApp [data-testid="stAlertContentError"] p { color: var(--color-ink); }
+
 @media (max-width: 60rem) {
   [data-testid="stMainBlockContainer"] { padding-inline: var(--space-md); }
   .stat-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
