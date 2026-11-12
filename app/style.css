@@ -59,7 +59,7 @@ html, body, .stApp, .stApp p, .stApp li, .stApp label, .stApp input, .stApp text
 .stApp [class*="st-key-report_"] h2 { font-size: var(--text-lg); margin: var(--space-lg) 0 var(--space-2xs); padding: 0; }
 .stApp [class*="st-key-report_"] li, .stApp [class*="st-key-report_"] p { line-height: 1.6; }
 
-/* controls: pills, violet primary, outlined secondary */
+/* controls: pills, terracotta primary, outlined secondary */
 .stApp button[data-testid^="stBaseButton"] {
   min-height: 40px; border-radius: var(--radius-pill); font-weight: 500; padding-inline: var(--space-md);
   transition: background-color var(--dur-micro) var(--ease-out), color var(--dur-micro) var(--ease-out), border-color var(--dur-micro) var(--ease-out);
@@ -74,7 +74,7 @@ html, body, .stApp, .stApp p, .stApp li, .stApp label, .stApp input, .stApp text
 .stApp [data-testid="stFileUploaderDropzone"] { border-radius: var(--radius-card); background: var(--color-paper-2); border: 1.5px dashed var(--color-rule-2); }
 .stApp [data-baseweb="input"], .stApp [data-baseweb="select"] > div, .stApp [data-baseweb="textarea"] { border-radius: 12px; }
 
-/* alerts: Streamlit's pale yellow text fails contrast on lavender; keep its tint, set ink text */
+/* alerts: Streamlit's pale yellow text fails contrast; keep its tint, set ink text */
 .stApp [data-testid="stAlertContentWarning"] p, .stApp [data-testid="stAlertContentInfo"] p,
 .stApp [data-testid="stAlertContentSuccess"] p, .stApp [data-testid="stAlertContentError"] p { color: var(--color-ink); }
 

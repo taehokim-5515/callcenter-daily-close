@@ -10,6 +10,7 @@ import altair as alt
 import pandas as pd
 import streamlit as st
 
+import charts as C
 import theme as T
 from ai import AiError, analyze, get_api_key
 from db import MissingSchema, open_store
@@ -23,6 +24,8 @@ COLOR_GROUP = {"배송": "배송", "상품": "상품", "취소/반품/교환": "
                "단순문의": "단순문의, 클레임", **{b: "단순문의, 클레임" for b in BRANDS}}
 COLOR_ORDER = ["배송", "상품", "취소/반품/교환", "단순문의, 클레임"]
 REASON_TOP = ["고객변심", "상품불만", "오매핑"]  # 나머지 사유는 기타로 묶어 4색
+LEVEL1 = {"배송": "배송", "상품": "상품", "단순문의": "단순문의", "취소/반품/교환": "취소/반품/교환",
+          **{b: "브랜드 클레임" for b in BRANDS}}
 
 st.set_page_config(page_title="콜센터 일마감", layout="wide", initial_sidebar_state="collapsed")
 try:
@@ -165,6 +168,20 @@ def stat_row(items: list[tuple[str, str, str]]) -> str:
     return f'<dl class="stat-row">{cells}</dl>'
 
 
+def head(subject: str, takeaway: str, note: str | None = None):
+    """보고용 머리: 결론 문장을 제목으로, 무엇을 그린 차트인지는 아래 작은 줄로."""
+    sub = subject + (f", {note}" if note else "")
+    st.markdown(f'<h2 class="section-head">{takeaway}</h2><p class="section-note">{sub}</p>',
+                unsafe_allow_html=True)
+
+
+def ig(word: str) -> str:
+    """받침에 맞춰 '이/가'를 붙인다."""
+    c = word[-1] if word else ""
+    has = "가" <= c <= "힣" and (ord(c) - 0xAC00) % 28 != 0
+    return word + ("이" if has else "가")
+
+
 def fmt(n) -> str:
     return f"{int(n):,}"
 
@@ -231,38 +248,51 @@ with tab_day:
             ("취소/반품/교환", fmt(by_grp.get("취소/반품/교환", 0)), f"건, 클레임 {fmt(sum(by_grp.get(b, 0) for b in BRANDS))}건"),
         ]), unsafe_allow_html=True)
 
-        st.markdown('<h2 class="section-head">유형별 건수</h2>'
-                    '<p class="section-note">0건 유형은 뺐습니다. 막대 색은 대분류입니다.</p>',
-                    unsafe_allow_html=True)
-        bt = cur.groupby(["category", "type"])["cnt"].sum().reset_index()
-        bt = bt[bt["cnt"] > 0].sort_values("cnt", ascending=False)
-        bt["묶음"] = bt["category"].map(COLOR_GROUP)
-        if len(bt):
-            chart = (alt.Chart(bt).mark_bar(cornerRadiusEnd=4, height=16)
-                     .encode(y=alt.Y("type:N", sort="-x", title=None, axis=alt.Axis(labelOverlap=False, labelLimit=140)),
-                             x=alt.X("cnt:Q", title="건수", axis=alt.Axis(tickMinStep=1, grid=False)),
-                             color=alt.Color("묶음:N", title="대분류",
-                                             scale=alt.Scale(domain=COLOR_ORDER, range=T.SERIES)),
-                             tooltip=[alt.Tooltip("category", title="대분류"), alt.Tooltip("type", title="유형"),
-                                      alt.Tooltip("cnt", title="건수")])
-                     .properties(height=max(24 * len(bt), 120)))
-            labels = chart.mark_text(align="left", dx=4, color=T.INK_2, fontSize=12).encode(
-                text="cnt:Q", color=alt.value(T.INK_2))
-            st.altair_chart(chart + labels, use_container_width=True)
+        # 1) 유형 순위: 상위 10개
+        tt = cur.groupby("type")["cnt"].sum().reset_index()
+        tt = tt[tt["cnt"] > 0].sort_values("cnt", ascending=False)
+        if len(tt):
+            top3 = tt.head(3)
+            share3 = top3["cnt"].sum() / max(total, 1) * 100
+            rest = tt.iloc[10:]
+            head("문의 유형 상위 10",
+                 f"{', '.join(top3['type'])} 세 유형이 {fmt(top3['cnt'].sum())}건으로 전체의 {share3:.0f}%입니다.",
+                 f"그 외 {len(rest)}개 유형 {fmt(rest['cnt'].sum())}건" if len(rest) else None)
+            st.altair_chart(C.hbar(tt.head(10), "type", "cnt", total=int(total)), use_container_width=True, theme=None)
 
-        st.markdown('<h2 class="section-head">마켓별 대분류</h2>', unsafe_allow_html=True)
-        pv = cur.pivot_table(index="market", columns="category", values="cnt", aggfunc="sum", fill_value=0)
-        pv = pv[[g for g in GROUP_ORDER if g in pv.columns]]
-        pv["합계"] = pv.sum(axis=1)
-        pv = pv.sort_values("합계", ascending=False)
-        pv.loc["합계"] = pv.sum()
-        st.dataframe(pv.rename_axis(index="마켓", columns=None), use_container_width=True)
-
+        # 2) 대분류 구성 | 반품 처리
+        g = (cur.assign(묶음=cur["category"].map(LEVEL1)).groupby("묶음")["cnt"].sum().reset_index())
         r = q_returns(day, day)
-        if len(r):
-            st.markdown('<h2 class="section-head">반품 처리건수</h2>', unsafe_allow_html=True)
-            rr = r.assign(구분=r["kind"], 사유=r["reason"].replace("", "-"))[["구분", "사유", "cnt"]]
-            st.dataframe(rr.rename(columns={"cnt": "건수"}), hide_index=True, use_container_width=False)
+        col_a, col_b = st.columns(2, gap="large")
+        with col_a:
+            gt = g.sort_values("cnt", ascending=False)
+            head("대분류 구성", f"{gt.iloc[0]['묶음']} 문의가 {fmt(gt.iloc[0]['cnt'])}건으로 가장 많습니다.")
+            st.altair_chart(C.hbar(gt, "묶음", "cnt", highlight=1, row=40), use_container_width=True, theme=None)
+        with col_b:
+            if len(r):
+                rr = r.assign(항목=r.apply(lambda x: x["kind"] if not x["reason"] else f"반품 {x['reason']}", axis=1))
+                rr = rr.groupby("항목")["cnt"].sum().reset_index()
+                ret_n = int(r[r["kind"] == "반품"]["cnt"].sum())
+                top_r = rr.sort_values("cnt", ascending=False).iloc[0]
+                head("반품 처리건수",
+                     f"처리 {fmt(rr['cnt'].sum())}건 중 반품 {fmt(ret_n)}건, 최다는 {top_r['항목']} {fmt(top_r['cnt'])}건입니다.")
+                st.altair_chart(C.hbar(rr, "항목", "cnt", highlight=1, row=32), use_container_width=True, theme=None)
+            else:
+                head("반품 처리건수", "이 날짜에는 반품 처리표가 없습니다.")
+
+        # 3) 마켓 순위
+        mk = cur.groupby("market")["cnt"].sum().reset_index().sort_values("cnt", ascending=False)
+        top_m = mk.head(3)
+        head("마켓별 문의",
+             f"{', '.join(top_m['market'])} 세 곳이 {top_m['cnt'].sum() / max(total, 1) * 100:.0f}%를 차지합니다.")
+        st.altair_chart(C.hbar(mk, "market", "cnt", row=28), use_container_width=True, theme=None)
+        with st.expander("마켓 x 대분류 표 보기"):
+            pv = cur.pivot_table(index="market", columns="category", values="cnt", aggfunc="sum", fill_value=0)
+            pv = pv[pv.sum().sort_values(ascending=False).index]
+            pv["합계"] = pv.sum(axis=1)
+            pv = pv.sort_values("합계", ascending=False)
+            pv.loc["합계"] = pv.sum()
+            st.dataframe(pv.rename_axis(index="마켓", columns=None), use_container_width=True)
 
 
 # ================================================================ 월간 추이
@@ -288,33 +318,34 @@ with tab_month:
             ("최소일", fmt(tot.min()), dlabel(tot.idxmin())),
         ]), unsafe_allow_html=True)
 
-        st.markdown('<h2 class="section-head">일자별 문의 건수</h2>', unsafe_allow_html=True)
         daily["일"] = daily["day"].map(lambda s: f"{int(s[8:])}일")
         order = [f"{int(s[8:])}일" for s in sorted(tot.index)]
-        st.altair_chart(
-            alt.Chart(daily).mark_bar(cornerRadiusTopLeft=3, cornerRadiusTopRight=3)
-            .encode(x=alt.X("일:N", sort=order, title=None, axis=alt.Axis(labelAngle=0)),
-                    y=alt.Y("cnt:Q", title="건수"),
-                    color=alt.Color("묶음:N", title="대분류", scale=alt.Scale(domain=COLOR_ORDER, range=T.SERIES)),
-                    order=alt.Order("묶음:N"),
-                    tooltip=[alt.Tooltip("일"), alt.Tooltip("묶음", title="대분류"), alt.Tooltip("cnt", title="건수")])
-            .properties(height=320), use_container_width=True)
+        above = int((tot > tot.mean()).sum())
+        head("일자별 문의 건수, 많은 날부터, 대분류 누적",
+             f"하루 평균 {fmt(round(tot.mean()))}건, 최다는 {dlabel(tot.idxmax())} {fmt(tot.max())}건입니다.",
+             f"평균을 넘은 날 {above}일")
+        st.altair_chart(C.stacked_cols(daily, "일", order, "묶음", COLOR_ORDER, avg=float(tot.mean())),
+                        use_container_width=True, theme=None)
+
+        tm = mon.groupby("type")["cnt"].sum().reset_index().sort_values("cnt", ascending=False)
+        t3 = tm.head(3)
+        head(f"{m}월 문의 유형 상위 10",
+             f"{m}월 누계에서는 {', '.join(t3['type'])} 순으로 많습니다.",
+             f"세 유형 합계 {fmt(t3['cnt'].sum())}건, {t3['cnt'].sum() / max(tot.sum(), 1) * 100:.0f}%")
+        st.altair_chart(C.hbar(tm.head(10), "type", "cnt", total=int(tot.sum())), use_container_width=True, theme=None)
 
         key = "category" if view == "대분류" else "type"
         pv = mon.pivot_table(index=key, columns="day", values="cnt", aggfunc="sum", fill_value=0)
         pv.columns = [f"{int(c[8:])}일" for c in pv.columns]
         pv["합계"] = pv.sum(axis=1)
-        if key == "category":
-            pv = pv.reindex([g for g in GROUP_ORDER if g in pv.index])
-        else:
-            pv = pv.sort_values("합계", ascending=False)
+        pv = pv.sort_values("합계", ascending=False)
         pv.loc["합계"] = pv.sum()
-        st.markdown(f'<h2 class="section-head">{view} x 일자</h2>', unsafe_allow_html=True)
         pv = pv.rename_axis(index=view, columns=None)
-        st.dataframe(pv, use_container_width=True)
+        with st.expander(f"{view} x 일자 표 보기"):
+            st.dataframe(pv, use_container_width=True)
 
         mk = mon.pivot_table(index="market", columns="category", values="cnt", aggfunc="sum", fill_value=0)
-        mk = mk[[g for g in GROUP_ORDER if g in mk.columns]]
+        mk = mk[mk.sum().sort_values(ascending=False).index]
         mk["합계"] = mk.sum(axis=1)
         mk = mk.sort_values("합계", ascending=False).rename_axis(index="마켓", columns=None)
         st.download_button("월 집계 엑셀 받기", to_xlsx({f"{view}x일자": pv, "마켓x대분류": mk}),
@@ -342,32 +373,44 @@ with tab_ret:
             f'가장 많은 사유는 {pm.sum(axis=1).idxmax()} {fmt(pm.sum(axis=1).max())}건.</p></section>',
             unsafe_allow_html=True)
         src_last = mr[mr["month"] == last_m]["src"].iloc[0]
+        full_m = mtot.drop(last_m) if src_last == "일자 기록" and len(mtot) > 1 else mtot
         st.markdown(stat_row([
             (f"{last_m}월", fmt(mtot[last_m]), "건, 진행 중" if src_last == "일자 기록" else "건"),
             (f"{prev_m}월" if prev_m else "전월", fmt(mtot[prev_m]) if prev_m else "-", "건"),
-            ("월평균", fmt(round(mtot.mean())), f"건, {len(mtot)}개월"),
+            ("월평균", fmt(round(full_m.mean())), f"건, 마감된 {len(full_m)}개월"),
             ("고객변심 비중", f"{pm.loc['고객변심'].sum() / max(mtot.sum(), 1) * 100:.0f}" if "고객변심" in pm.index else "-", "%"),
         ]), unsafe_allow_html=True)
 
-        st.markdown('<h2 class="section-head">월별 반품 사유</h2>'
-                    '<p class="section-note">일자 기록이 있는 달은 일자 시트 반품 처리표의 합, '
-                    '없는 달은 월별반품누계 시트 값입니다. 차트는 상위 3개 사유 외를 기타로 묶었고, 표에는 사유별로 모두 나옵니다.</p>', unsafe_allow_html=True)
         mr["월"] = mr["month"].map(lambda x: f"{x}월")
         mr["사유"] = mr["reason"].where(mr["reason"].isin(REASON_TOP), "기타")
         mc = mr.groupby(["월", "사유"])["cnt"].sum().reset_index()
-        st.altair_chart(
-            alt.Chart(mc).mark_bar(cornerRadiusTopLeft=3, cornerRadiusTopRight=3)
-            .encode(x=alt.X("월:N", sort=[f"{i}월" for i in range(1, 13)], title=None, axis=alt.Axis(labelAngle=0)),
-                    y=alt.Y("cnt:Q", title="건수"),
-                    color=alt.Color("사유:N", title="사유", scale=alt.Scale(domain=[*REASON_TOP, "기타"], range=T.SERIES)),
-                    tooltip=[alt.Tooltip("월"), alt.Tooltip("사유"), alt.Tooltip("cnt", title="건수")])
-            .properties(height=320), use_container_width=True)
+        full = full_m  # 진행 중인 달은 평균에서 뺀다
+        peak = int(full.idxmax())
+        head("월별 반품 건수, 많은 달부터, 사유 누적",
+             f"월평균 {fmt(round(full.mean()))}건, {peak}월이 {fmt(full[peak])}건으로 가장 많았습니다.",
+             "상위 3개 사유 외는 기타로 묶음. 일자 기록이 있는 달은 처리표 합, 없는 달은 월별반품누계 시트 값")
+        st.altair_chart(C.stacked_cols(mc, "월", [f"{i}월" for i in range(1, 13)], "사유", [*REASON_TOP, "기타"],
+                                       avg=float(full.mean()),
+                                       partial=f"{last_m}월" if src_last == "일자 기록" else None),
+                        use_container_width=True, theme=None)
+
+        rs = pm.sum(axis=1).reset_index()
+        rs.columns = ["사유", "cnt"]
+        r1 = rs.sort_values("cnt", ascending=False).iloc[0]
+        head(f"{yr}년 사유별 누계",
+             f"{ig(r1['사유'])} {fmt(r1['cnt'])}건으로 {r1['cnt'] / max(mtot.sum(), 1) * 100:.0f}%를 차지합니다.",
+             "오매핑, 오패킹, 오출고 합계 "
+             f"{fmt(rs[rs['사유'].isin(['오매핑', '오패킹', '오출고'])]['cnt'].sum())}건")
+        st.altair_chart(C.hbar(rs, "사유", "cnt", highlight=1, row=34), use_container_width=True, theme=None)
+
         tbl = pm.copy()
         tbl.columns = [f"{c}월" for c in tbl.columns]
         tbl["누계"] = tbl.sum(axis=1)
+        tbl = tbl.sort_values("누계", ascending=False)
         tbl.loc["합계"] = tbl.sum()
         tbl = tbl.rename_axis(index="사유", columns=None)
-        st.dataframe(tbl, use_container_width=True)
+        with st.expander("사유 x 월 표 보기"):
+            st.dataframe(tbl, use_container_width=True)
         st.download_button("월별 반품 누계 엑셀 받기", to_xlsx({"월별반품누계": tbl}), file_name=f"반품누계_{yr}.xlsx")
 
         cur_months = sorted({s[:7] for s in DATES if s.startswith(str(yr))})
@@ -380,6 +423,7 @@ with tab_ret:
                 pd_ = rd.pivot_table(index="항목", columns="일", values="cnt", aggfunc="sum", fill_value=0, sort=False)
                 pd_ = pd_[sorted(pd_.columns, key=lambda s: int(s[:-1]))]
                 pd_["합계"] = pd_.sum(axis=1)
+                pd_ = pd_.sort_values("합계", ascending=False)
                 pd_ = pd_.rename_axis(columns=None)
                 st.markdown(f'<h2 class="section-head">{int(ym[5:])}월 일자별 처리건수</h2>', unsafe_allow_html=True)
                 st.dataframe(pd_, use_container_width=True)
@@ -457,26 +501,31 @@ with tab_claim:
     cm = q_calls(*month_range(y, m))
     cb = cm[cm["category"].isin(BRANDS)]
 
-    st.markdown('<h2 class="section-head">브랜드별 클레임 문의</h2>'
-                '<p class="section-note">일자 시트의 브랜드 칸(마켓 합)입니다.</p>', unsafe_allow_html=True)
     if cb.empty:
-        st.markdown('<p class="section-note">이 달에는 브랜드 클레임 문의가 없습니다.</p>', unsafe_allow_html=True)
+        head("브랜드별 클레임 문의", f"{m}월에는 브랜드 클레임 문의가 없습니다.")
     else:
+        ctot = int(cb["cnt"].sum())
+        bsum = cb.groupby("category")["cnt"].sum().reindex(BRANDS, fill_value=0)
+        tsum = cb.groupby("type")["cnt"].sum().sort_values(ascending=False)
+        st.markdown(stat_row([
+            (f"{m}월 클레임 문의", fmt(ctot), "건"),
+            *[(b, fmt(bsum[b]), f"건, {bsum[b] / max(ctot, 1) * 100:.0f}%") for b in bsum.sort_values(ascending=False).index],
+        ]), unsafe_allow_html=True)
+        head("클레임 유형별 건수, 브랜드 구성",
+             f"{tsum.index[0]} {fmt(tsum.iloc[0])}건이 가장 많고, {ig(bsum.idxmax())} 전체의 "
+             f"{bsum.max() / max(ctot, 1) * 100:.0f}%입니다.",
+             "일자 시트의 브랜드 칸(마켓 합)")
+        bt = cb.groupby(["type", "category"])["cnt"].sum().reset_index()
+        st.altair_chart(C.stacked_hbar(bt, "type", "category", BRANDS, [T.ACCENT, T.INK, T.AMBER]),
+                        use_container_width=True, theme=None)
         bp = cb.pivot_table(index="type", columns="category", values="cnt", aggfunc="sum", fill_value=0)
         bp = bp.reindex(index=CLAIM_TYPES, columns=BRANDS, fill_value=0)
         bp["합계"] = bp.sum(axis=1)
+        bp = bp.sort_values("합계", ascending=False)
+        bp = bp[bsum.sort_values(ascending=False).index.tolist() + ["합계"]]
         bp.loc["합계"] = bp.sum()
-        bp = bp.rename_axis(index="유형", columns=None)
-        cc1, cc2 = st.columns([2, 3])
-        cc1.dataframe(bp, use_container_width=True)
-        cd = cb.groupby(["call_date", "category"])["cnt"].sum().reset_index()
-        cd["일"] = cd["call_date"].astype(str).str[8:10].astype(int)
-        cc2.altair_chart(
-            alt.Chart(cd).mark_bar(cornerRadiusTopLeft=3, cornerRadiusTopRight=3)
-            .encode(x=alt.X("일:O", title=None, axis=alt.Axis(labelAngle=0)), y=alt.Y("cnt:Q", title="건수"),
-                    color=alt.Color("category:N", title="브랜드", scale=alt.Scale(domain=BRANDS, range=[T.ACCENT, T.INK, T.AMBER])),
-                    tooltip=[alt.Tooltip("일"), alt.Tooltip("category", title="브랜드"), alt.Tooltip("cnt", title="건수")])
-            .properties(height=260), use_container_width=True)
+        with st.expander("유형 x 브랜드 표 보기"):
+            st.dataframe(bp.rename_axis(index="유형", columns=None), use_container_width=True)
 
     st.markdown('<h2 class="section-head">클레임 기록과 AI 처리 방향</h2>'
                 '<p class="section-note">제품명, 유형, 수량, 생각한 방향성을 적고 분석을 누르면 과거 같은 제품 기록과 '
