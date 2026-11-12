@@ -8,11 +8,13 @@
   --color-error: oklch(52% 0.19 27); --color-success: oklch(50% 0.12 150);
   --container: 1440px; --gutter: 64px; --gap-columns: 32px; --section-gap-s: 120px; --section-gap: 144px; --section-gap-l: 176px;
   --z-base: 1; --z-raised: 10; --z-dropdown: 100; --z-sticky: 200; --z-sticky-nav: 300; --z-modal: 400; --z-toast: 500; --z-tooltip: 600;
-  --color-paper: oklch(95% 0.02 300); --color-paper-2: oklch(92% 0.03 300); --color-paper-3: oklch(89% 0.035 300);
-  --color-ink: oklch(18% 0.02 300); --color-ink-2: oklch(28% 0.03 300); --color-muted: oklch(46% 0.05 300);
-  --color-rule: oklch(84% 0.04 300); --color-rule-2: oklch(70% 0.08 295);
-  --color-accent: oklch(50% 0.25 290); --color-accent-deep: oklch(43% 0.22 290); --color-accent-soft: oklch(86% 0.08 295);
-  --color-accent-ink: oklch(97% 0.01 300); --color-focus: oklch(50% 0.25 290);
+  /* warm palette by request: white paper + 4 colours (brown ink, terracotta, amber, sand) */
+  --color-paper: #ffffff; --color-paper-2: #faf6f1; --color-paper-3: #f3ebe1;
+  --color-ink: #3b2a20; --color-ink-2: #4e3b2f; --color-muted: #7a6a5e;
+  --color-rule: #ece3d9; --color-rule-2: #d9c7b4;
+  --color-accent: #b84a32; --color-accent-deep: #963a27; --color-accent-soft: #f6e1d8;
+  --color-accent-ink: #ffffff; --color-focus: #b84a32;
+  --color-amber: #e8a33d; --color-sand: #e6d5c0;
   --font-display: "Outfit", ui-sans-serif, system-ui, sans-serif; --font-body: "Onest", ui-sans-serif, sans-serif;
   --font-outlier: "JetBrains Mono", ui-monospace, monospace;
   --radius-card: 16px; --radius-pill: 999px; --rule-hair: 1px;

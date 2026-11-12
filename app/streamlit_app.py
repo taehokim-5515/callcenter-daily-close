@@ -18,6 +18,11 @@ from parser import BRANDS, CLAIM_TYPES, RETURN_REASONS, ScmFormatError, guess_mo
 HERE = Path(__file__).resolve().parent
 WD = "월화수목금토일"
 GROUP_ORDER = ["배송", "상품", "단순문의", "취소/반품/교환", *BRANDS]
+# 차트 색은 4가지만: 대분류 7개를 4묶음으로
+COLOR_GROUP = {"배송": "배송", "상품": "상품", "취소/반품/교환": "취소/반품/교환",
+               "단순문의": "단순문의, 클레임", **{b: "단순문의, 클레임" for b in BRANDS}}
+COLOR_ORDER = ["배송", "상품", "취소/반품/교환", "단순문의, 클레임"]
+REASON_TOP = ["고객변심", "상품불만", "오매핑"]  # 나머지 사유는 기타로 묶어 4색
 
 st.set_page_config(page_title="콜센터 일마감", layout="wide", initial_sidebar_state="collapsed")
 try:
@@ -231,12 +236,13 @@ with tab_day:
                     unsafe_allow_html=True)
         bt = cur.groupby(["category", "type"])["cnt"].sum().reset_index()
         bt = bt[bt["cnt"] > 0].sort_values("cnt", ascending=False)
+        bt["묶음"] = bt["category"].map(COLOR_GROUP)
         if len(bt):
             chart = (alt.Chart(bt).mark_bar(cornerRadiusEnd=4, height=16)
                      .encode(y=alt.Y("type:N", sort="-x", title=None, axis=alt.Axis(labelOverlap=False, labelLimit=140)),
                              x=alt.X("cnt:Q", title="건수", axis=alt.Axis(tickMinStep=1, grid=False)),
-                             color=alt.Color("category:N", title="대분류",
-                                             scale=alt.Scale(domain=GROUP_ORDER, range=T.SERIES)),
+                             color=alt.Color("묶음:N", title="대분류",
+                                             scale=alt.Scale(domain=COLOR_ORDER, range=T.SERIES)),
                              tooltip=[alt.Tooltip("category", title="대분류"), alt.Tooltip("type", title="유형"),
                                       alt.Tooltip("cnt", title="건수")])
                      .properties(height=max(24 * len(bt), 120)))
@@ -271,7 +277,8 @@ with tab_month:
         y, m = int(ym[:4]), int(ym[5:])
         mon = q_calls(*month_range(y, m)).copy()
         mon["day"] = mon["call_date"].astype(str).str[:10]
-        daily = mon.groupby(["day", "category"])["cnt"].sum().reset_index()
+        daily = (mon.assign(묶음=mon["category"].map(COLOR_GROUP))
+                 .groupby(["day", "묶음"])["cnt"].sum().reset_index())
         tot = mon.groupby("day")["cnt"].sum()
 
         st.markdown(stat_row([
@@ -288,9 +295,9 @@ with tab_month:
             alt.Chart(daily).mark_bar(cornerRadiusTopLeft=3, cornerRadiusTopRight=3)
             .encode(x=alt.X("일:N", sort=order, title=None, axis=alt.Axis(labelAngle=0)),
                     y=alt.Y("cnt:Q", title="건수"),
-                    color=alt.Color("category:N", title="대분류", scale=alt.Scale(domain=GROUP_ORDER, range=T.SERIES)),
-                    order=alt.Order("category:N"),
-                    tooltip=[alt.Tooltip("일"), alt.Tooltip("category", title="대분류"), alt.Tooltip("cnt", title="건수")])
+                    color=alt.Color("묶음:N", title="대분류", scale=alt.Scale(domain=COLOR_ORDER, range=T.SERIES)),
+                    order=alt.Order("묶음:N"),
+                    tooltip=[alt.Tooltip("일"), alt.Tooltip("묶음", title="대분류"), alt.Tooltip("cnt", title="건수")])
             .properties(height=320), use_container_width=True)
 
         key = "category" if view == "대분류" else "type"
@@ -344,15 +351,16 @@ with tab_ret:
 
         st.markdown('<h2 class="section-head">월별 반품 사유</h2>'
                     '<p class="section-note">일자 기록이 있는 달은 일자 시트 반품 처리표의 합, '
-                    '없는 달은 월별반품누계 시트 값입니다.</p>', unsafe_allow_html=True)
+                    '없는 달은 월별반품누계 시트 값입니다. 차트는 상위 3개 사유 외를 기타로 묶었고, 표에는 사유별로 모두 나옵니다.</p>', unsafe_allow_html=True)
         mr["월"] = mr["month"].map(lambda x: f"{x}월")
+        mr["사유"] = mr["reason"].where(mr["reason"].isin(REASON_TOP), "기타")
+        mc = mr.groupby(["월", "사유"])["cnt"].sum().reset_index()
         st.altair_chart(
-            alt.Chart(mr).mark_bar(cornerRadiusTopLeft=3, cornerRadiusTopRight=3)
+            alt.Chart(mc).mark_bar(cornerRadiusTopLeft=3, cornerRadiusTopRight=3)
             .encode(x=alt.X("월:N", sort=[f"{i}월" for i in range(1, 13)], title=None, axis=alt.Axis(labelAngle=0)),
                     y=alt.Y("cnt:Q", title="건수"),
-                    color=alt.Color("reason:N", title="사유", scale=alt.Scale(domain=RETURN_REASONS, range=T.SERIES)),
-                    tooltip=[alt.Tooltip("월"), alt.Tooltip("reason", title="사유"), alt.Tooltip("cnt", title="건수"),
-                             alt.Tooltip("src", title="출처")])
+                    color=alt.Color("사유:N", title="사유", scale=alt.Scale(domain=[*REASON_TOP, "기타"], range=T.SERIES)),
+                    tooltip=[alt.Tooltip("월"), alt.Tooltip("사유"), alt.Tooltip("cnt", title="건수")])
             .properties(height=320), use_container_width=True)
         tbl = pm.copy()
         tbl.columns = [f"{c}월" for c in tbl.columns]
@@ -466,7 +474,7 @@ with tab_claim:
         cc2.altair_chart(
             alt.Chart(cd).mark_bar(cornerRadiusTopLeft=3, cornerRadiusTopRight=3)
             .encode(x=alt.X("일:O", title=None, axis=alt.Axis(labelAngle=0)), y=alt.Y("cnt:Q", title="건수"),
-                    color=alt.Color("category:N", title="브랜드", scale=alt.Scale(domain=BRANDS, range=[T.ACCENT, T.INK_2, T.RULE_2])),
+                    color=alt.Color("category:N", title="브랜드", scale=alt.Scale(domain=BRANDS, range=[T.ACCENT, T.INK, T.AMBER])),
                     tooltip=[alt.Tooltip("일"), alt.Tooltip("category", title="브랜드"), alt.Tooltip("cnt", title="건수")])
             .properties(height=260), use_container_width=True)
 

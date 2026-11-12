@@ -1,5 +1,5 @@
-/* Hallmark · shape: app screen · genre: modern-minimal · theme: Ultraviolet (deal 3/3, seed daily-call-center-closing-1cfc·18f4a652·2026-11-12·r0)
- * nav: top bar with tabs, day picker in the toolbar row · signature: the day's call ledger, one big total over the type bars · states: loading, empty, error, full · ultraviolet: lavender
+/* Hallmark · shape: app screen · genre: modern-minimal · theme: Ultraviolet faces, warm palette by request (white paper, brown ink, terracotta, amber, sand)
+ * nav: top bar with tabs, day picker in the toolbar row · signature: the day's call ledger, one big total over the type bars · states: loading, empty, error, full · palette: warm 4-colour
  * axes: light/geometric-sans/cool · posture: committed · contrast: pass · v2.0.0 */
 /* Hallmark · pre-emit critique: P2 H- E2 S2 R2 V2 · weakest: Streamlit owns tables, tabs and inputs, so tokens reach them through config.toml as hex mirrors of :root */
 /* Hallmark · waive 37 · copy is Korean · Pretendard is the Hangul fallback behind Outfit and Onest, which have no Hangul */

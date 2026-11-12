@@ -1,16 +1,17 @@
-"""Altair 차트용 색: style.css / tokens.css :root 토큰(Ultraviolet, lavender)의 hex 사본."""
-PAPER = "#f0ecfa"
-PAPER_2 = "#e7e1f6"
-INK = "#131019"
-INK_2 = "#2b2636"
-MUTED = "#5c5270"
-RULE = "#cec5e1"
-RULE_2 = "#a295cb"
-ACCENT = "#6b2ae3"
-ACCENT_SOFT = "#d4c7ff"
+"""Altair 차트용 색: tokens.css :root 토큰(흰 바탕 + 따뜻한 4색)의 hex 사본."""
+PAPER = "#ffffff"
+PAPER_2 = "#faf6f1"
+INK = "#3b2a20"      # 짙은 갈색
+INK_2 = "#4e3b2f"
+MUTED = "#7a6a5e"
+RULE = "#ece3d9"
+RULE_2 = "#d9c7b4"
+ACCENT = "#b84a32"   # 테라코타
+AMBER = "#e8a33d"    # 황토
+SAND = "#e6d5c0"     # 모래
 FONT = "Onest, 'Pretendard Variable', Pretendard, sans-serif"
-# 대분류·사유 색: 바이올렛 한 계열의 명도 단계 (잉크 → 연보라). 강조색은 그중 한 칸.
-SERIES = ["#2b2636", "#6b2ae3", "#a295cb", "#5c5270", "#d4c7ff", "#8a7fa6", "#cec5e1"]
+# 차트는 이 4색만 쓴다: 갈색, 테라코타, 황토, 모래
+SERIES = [INK, ACCENT, AMBER, SAND]
 
 
 def altair_theme():

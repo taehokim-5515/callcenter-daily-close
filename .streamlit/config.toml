@@ -1,13 +1,13 @@
-# Hallmark · Ultraviolet (app screen) — app/tokens.css :root 의 hex 사본. Streamlit 캔버스(표·탭·입력)가 여기서 색을 읽는다.
+# Hallmark · warm 4-colour (app screen) — app/tokens.css :root 의 hex 사본. Streamlit 캔버스(표·탭·입력)가 여기서 색을 읽는다.
 [theme]
 base = "light"
-primaryColor = "#6b2ae3"
-backgroundColor = "#f0ecfa"
-secondaryBackgroundColor = "#e7e1f6"
-textColor = "#131019"
-borderColor = "#cec5e1"
-linkColor = "#571dbc"
-dataframeHeaderBackgroundColor = "#e7e1f6"
+primaryColor = "#b84a32"
+backgroundColor = "#ffffff"
+secondaryBackgroundColor = "#faf6f1"
+textColor = "#3b2a20"
+borderColor = "#e3d6c8"
+linkColor = "#963a27"
+dataframeHeaderBackgroundColor = "#f3ebe1"
 font = "Onest, 'Pretendard Variable', Pretendard, 'Malgun Gothic', sans-serif"
 headingFont = "Outfit, 'Pretendard Variable', Pretendard, sans-serif"
 baseFontSize = 15
